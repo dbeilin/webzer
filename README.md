@@ -57,6 +57,9 @@ Device nodes are passed in when the container starts, so restart it after pluggi
 
 ## Notes
 
+- **Security:** the helper listens on `127.0.0.1` only and answers only its own page (and local tools
+  like `curl`). Requests from other websites, including DNS-rebinding tricks, get a 403.
+
 - **Mouse protocol:** 90-byte feature reports as documented by [OpenRazer](https://github.com/openrazer/openrazer).
   The onboard profile comes from command class `0x05`, which is undocumented. Its meaning was inferred
   from a mouse with one stored profile.

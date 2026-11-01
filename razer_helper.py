@@ -383,12 +383,32 @@ def headset_preset(q: dict) -> dict:
 ROUTES = {"/api/status": lambda q: status(), "/api/mouse/raw": mouse_raw, "/api/headset/raw": headset_raw}
 POST_ROUTES = {"/api/headset/preset": headset_preset}
 
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(ROOT), **kw)
 
+    def _from_own_page(self) -> bool:
+        """Only this helper's own page (or a local tool like curl) may talk to it.
+
+        Any website open in the browser can send requests to localhost, and DNS
+        rebinding lets one pose as a local host name. So: the Host must be a local
+        name, and a browser request must come from the same origin.
+        """
+        host = self.headers.get("Host", "")
+        if urlparse("//" + host).hostname not in LOCAL_HOSTS:
+            return False
+        origin = self.headers.get("Origin")
+        if origin is not None and urlparse(origin).netloc != host:
+            return False
+        # Browsers omit Origin on cross-site GETs, but always send Sec-Fetch-Site.
+        return self.headers.get("Sec-Fetch-Site", "none") in ("same-origin", "none")
+
     def do_POST(self):
+        if not self._from_own_page():
+            return self.send_error(403)
         url = urlparse(self.path)
         route = POST_ROUTES.get(url.path)
         if route is None:
@@ -396,6 +416,8 @@ class Handler(SimpleHTTPRequestHandler):
         self._api(route, url)
 
     def do_GET(self):
+        if not self._from_own_page():
+            return self.send_error(403)
         url = urlparse(self.path)
         route = ROUTES.get(url.path)
         if route is None:
@@ -416,10 +438,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def log_message(self, fmt, *args):
-        if self.path.startswith("/api/"):
-            return  # the page polls; keep the console quiet
-        super().log_message(fmt, *args)
+    def log_request(self, code="-", size="-"):
+        if self.path.startswith("/api/") and str(code).startswith("2"):
+            return  # the page polls; keep the console quiet, but log failures and blocks
+        super().log_request(code, size)
 
 
 if __name__ == "__main__":

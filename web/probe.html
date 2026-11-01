@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Razer HID Probe</title>
+<style>
+  :root {
+    --bg: #0f1112; --panel: #181b1d; --line: #2a2f33; --text: #e6e9eb; --muted: #8b9399;
+    --accent: #44d62c; --warn: #f0b429; --err: #ff6b6b; --in: #6cb6ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f5f6f7; --panel: #fff; --line: #dde1e4; --text: #15181a; --muted: #5f676d;
+      --accent: #1f8f0f; --warn: #a86b00; --err: #c62828; --in: #1565c0; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 1.5rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  h3 { font-size: .95rem; margin: 0 0 8px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-top: 16px; }
+  .hint, .lede { color: var(--muted); margin: 0 0 12px; }
+  .mono, pre, input, select { font-family: ui-monospace, Consolas, monospace; }
+  .mono { color: var(--muted); font-weight: normal; }
+  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 12px; margin: 0 6px 6px 0; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  select, input[type=text] { background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; font-size: 13px; max-width: 100%; }
+  label { display: inline-flex; gap: 6px; align-items: center; margin: 0 12px 8px 0; flex-wrap: wrap; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 12px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  td.good { color: var(--accent); }
+  .banner { padding: 10px 14px; border-radius: 8px; margin-top: 16px; }
+  .banner.bad { background: color-mix(in srgb, var(--err) 18%, transparent); }
+  .banner.goodbg { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0 0; padding: 10px 12px 4px; }
+  legend { color: var(--muted); padding: 0 4px; }
+  input.w1 { width: 5.5em; } input.w2 { width: 22em; }
+  #log { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+    height: 360px; overflow: auto; font-size: 12px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-all; }
+  #log .ok { color: var(--accent); } #log .warn { color: var(--warn); } #log .err { color: var(--err); }
+  #log .in { color: var(--in); } #log .dim { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Razer HID probe</h1>
+  <p class="lede">Step 1 of the Razer web app: see what Chrome can reach, and whether the Viper V3 Pro and BlackShark V2 Pro answer.</p>
+  <div id="env" class="banner"></div>
+
+  <section>
+    <h2>1. Connect</h2>
+    <p class="hint">Quit Razer Synapse completely (tray icon too). Click <b>Add Razer device</b> once per device:
+      the mouse on its cable, the mouse through its dongle, and the headset dongle. Chrome remembers them after that.</p>
+    <button id="connect" class="primary">Add Razer device…</button>
+    <button id="openAll">Open all &amp; listen</button>
+    <button id="copyInfo">Copy device info</button>
+    <div id="devices"></div>
+  </section>
+
+  <section>
+    <h2>2. Mouse reads</h2>
+    <p class="hint">Read-only commands from the documented Razer mouse protocol. Green in the log means the mouse answered.</p>
+    <div class="row">
+      <label>Send to <select id="target"></select></label>
+      <label>Transaction ID
+        <select id="tid">
+          <option value="auto">auto</option>
+          <option value="31">0x1F</option><option value="255">0xFF</option>
+          <option value="63">0x3F</option><option value="159">0x9F</option><option value="8">0x08</option>
+        </select>
+      </label>
+    </div>
+    <div id="mouseCmds"></div>
+    <button id="allMouse" class="primary">Run all reads</button>
+    <button id="batteryAll">Battery on every interface</button>
+  </section>
+
+  <section>
+    <h2>3. Profile experiments</h2>
+    <p class="hint">Onboard profiles aren't documented. If the values below change with the storage slot,
+      the slot byte is the profile number. These only read.</p>
+    <button id="dpiSlots">DPI per storage slot 0–5</button>
+    <button id="stagesSlots">DPI stages per slot 0–5</button>
+  </section>
+
+  <section>
+    <h2>4. Headset &amp; raw tools</h2>
+    <p class="hint">The headset uses an unknown protocol. Pick it as the target and read its feature reports.
+      With “Open all &amp; listen” on, change volume or the EQ preset, or plug in the charger, and watch for input reports.</p>
+    <button id="readFeatures">Read every feature report on target</button>
+    <label><input type="checkbox" id="logInput" checked> Log input reports</label>
+
+    <fieldset>
+      <legend>Razer command (90-byte packet)</legend>
+      <label>class <input id="rzClass" class="w1" type="text" value="0x05"></label>
+      <label>id <input id="rzId" class="w1" type="text" value="0x80"></label>
+      <label>size <input id="rzSize" class="w1" type="text" value="0x0A"></label>
+      <label>args <input id="rzArgs" class="w2" type="text" placeholder="01 00 …"></label>
+      <br><button id="rzSend">Send</button>
+      <button id="rzScan">Scan ids 0x80–0x8F in this class</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Raw report. Only send bytes you've been given; writes can change settings.</legend>
+      <label><select id="rawType"><option value="feature">feature</option><option value="output">output</option></select></label>
+      <label>report id <input id="rawId" class="w1" type="text" value="0"></label>
+      <label>bytes <input id="rawBytes" class="w2" type="text" placeholder="hex, e.g. 00 1f 00 00"></label>
+      <br><button id="rawSend">Send</button>
+    </fieldset>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <button id="copyLog" class="primary">Copy log</button>
+    <button id="clearLog">Clear</button>
+    <pre id="log"></pre>
+  </section>
+</main>
+<script type="module" src="probe.js"></script>
+</body>
+</html>

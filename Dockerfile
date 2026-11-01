@@ -3,10 +3,9 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-# Dependencies first so code changes don't reinstall them.
-# hidapi's Linux wheel bundles libudev/libusb, so no apt packages are needed.
+# hidapi's Linux wheel bundles libusb and libudev, so no apt packages are needed.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project
+RUN uv sync --locked --no-install-project
 
 COPY razer_helper.py ./
 COPY web ./web
@@ -16,4 +15,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     WEBZER_PORT=8137
 EXPOSE 8137
 
+# As PID 1, Python ignores SIGTERM, so docker stop would wait 10 s and then kill it.
+# SIGINT raises KeyboardInterrupt, which the helper handles.
+STOPSIGNAL SIGINT
 CMD ["python", "razer_helper.py"]

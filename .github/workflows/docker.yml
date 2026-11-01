@@ -1,0 +1,27 @@
+name: docker
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - run: docker build -t webzer .
+
+      - name: Status with no devices attached
+        run: |
+          docker run --rm webzer python razer_helper.py --once | tee status.json
+          jq -e '.mice == [] and .headset == null' status.json
+
+      - name: Request guard tests
+        run: docker run --rm -v "$PWD/tests:/app/tests:ro" webzer python -m unittest -v tests.test_request_guard
+
+      - name: Time docker stop
+        run: |
+          docker run -d --name webzer webzer
+          sleep 2
+          start=$(date +%s)
+          docker stop webzer
+          echo "docker stop took $(( $(date +%s) - start ))s"

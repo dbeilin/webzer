@@ -5,16 +5,13 @@ from http.server import ThreadingHTTPServer
 
 import razer_helper
 
-# (name, method, path, headers, expected status). "{port}" is filled in at runtime.
-# The POST asks for a preset that doesn't exist, so an allowed request fails with
-# 500 before any HID I/O and a blocked one gets 403.
 CASES = [
     ("curl on localhost", "GET", "/index.html", {"Host": "localhost:{port}"}, 200),
     ("curl on 127.0.0.1", "GET", "/index.html", {"Host": "127.0.0.1:{port}"}, 200),
     ("curl on [::1]", "GET", "/index.html", {"Host": "[::1]:{port}"}, 200),
     ("own page", "GET", "/index.html",
      {"Host": "localhost:{port}", "Origin": "http://localhost:{port}", "Sec-Fetch-Site": "same-origin"}, 200),
-    ("own page POST", "POST", "/api/headset/preset?id=999",
+    ("own page POST of an unknown preset fails before any HID I/O", "POST", "/api/headset/preset?id=999",
      {"Host": "localhost:{port}", "Origin": "http://localhost:{port}", "Sec-Fetch-Site": "same-origin"}, 500),
     ("address bar", "GET", "/index.html", {"Host": "localhost:{port}", "Sec-Fetch-Site": "none"}, 200),
     ("DNS rebinding", "GET", "/index.html", {"Host": "evil.example:{port}"}, 403),

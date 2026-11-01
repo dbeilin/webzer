@@ -6,8 +6,7 @@ serves the web page in web/.
 
     uv run razer_helper.py        then open http://localhost:8137
 
-Chrome can't send Razer's mouse commands (Windows protects mouse interfaces),
-so the browser goes through this helper for everything.
+The browser goes through this helper for every device.
 """
 from __future__ import annotations
 
@@ -80,8 +79,7 @@ def mouse_packet(cmd_class: int, cmd_id: int, size: int, args: bytes = b"") -> b
 
 
 class Mouse(HidDevice):
-    # path that answered last time, per PID, so later calls skip the search
-    paths: dict[int, bytes] = {}
+    last_good_path: dict[int, bytes] = {}
 
     def cmd(self, cmd_class: int, cmd_id: int, size: int, args: bytes = b"") -> list[int]:
         self.dev.send_feature_report(b"\x00" + mouse_packet(cmd_class, cmd_id, size, args))
@@ -106,11 +104,10 @@ class Mouse(HidDevice):
 
     @classmethod
     def open(cls, pid: int) -> "Mouse":
-        """Open the interface of this PID that answers Razer commands."""
         candidates = [d["path"] for d in hid.enumerate(RAZER_VID, pid)]
-        if pid in cls.paths and cls.paths[pid] in candidates:
-            candidates.remove(cls.paths[pid])
-            candidates.insert(0, cls.paths[pid])
+        if pid in cls.last_good_path and cls.last_good_path[pid] in candidates:
+            candidates.remove(cls.last_good_path[pid])
+            candidates.insert(0, cls.last_good_path[pid])
         last = "no interfaces"
         for path in candidates:
             try:
@@ -119,8 +116,8 @@ class Mouse(HidDevice):
                 last = str(e)
                 continue
             try:
-                m.cmd(0x00, 0x81, 0x02)  # firmware version: cheap, answered even when asleep
-                cls.paths[pid] = path
+                m.cmd(0x00, 0x81, 0x02)  # only the interface that takes Razer commands answers
+                cls.last_good_path[pid] = path
                 return m
             except (OSError, ValueError, DeviceError) as e:
                 last = str(e)
@@ -195,7 +192,7 @@ PA_FIRMWARE = 0x02
 PA_PRESET = 0x13       # query: active EQ preset
 PA_PREP = 0x1E         # query Synapse sends before audio writes
 PA_SET_PRESET = 0x93   # audio write: EQ preset selector
-PA_ENHANCE = 0x9D      # audio write: 2 for the esports presets, 1 otherwise
+PA_ENHANCE = 0x9D      # audio write
 TYPE_QUERY, TYPE_AUDIO = 0x03, 0x04
 
 # Wire value -> name, in Synapse's order. The five esports presets are listed in
@@ -239,7 +236,6 @@ class Headset(HidDevice):
             raise DeviceError("receiver rejected the write")
 
     def query(self, cmd: int) -> list[int] | None:
-        """Payload of the reply to `cmd`, or None if the headset didn't answer."""
         while self.dev.read(PA_LEN, 5):  # drop stale status frames
             pass
         self._write(pa_remote(True))  # the first frame only wakes the radio link
@@ -336,7 +332,6 @@ def hexbytes(s: str) -> bytes:
 
 
 def mouse_raw(q: dict) -> dict:
-    """Probe endpoint for reverse-engineering. Read commands (id >= 0x80) only."""
     num = lambda k, d=None: int(q[k][0], 16) if k in q else d
     cls, cid, size = num("class"), num("id"), num("size", 0x10)
     if cls is None or cid is None:
@@ -350,7 +345,6 @@ def mouse_raw(q: dict) -> dict:
 
 
 def headset_raw(q: dict) -> dict:
-    """Probe endpoint: one PA query (type 0x03, read-only)."""
     cmd = int(q["cmd"][0], 16)
     with Headset.open()[0] as h:
         payload = h.query(cmd)
@@ -422,7 +416,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def log_request(self, code="-", size="-"):
         if self.path.startswith("/api/") and str(code).startswith("2"):
-            return  # the page polls; keep the console quiet, but log failures and blocks
+            return
         super().log_request(code, size)
 
 

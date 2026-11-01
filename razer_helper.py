@@ -146,15 +146,23 @@ def read_mouse(pid: int) -> dict:
 
         field("battery", lambda: round(m.cmd(0x07, 0x80, 0x02)[1] / 255 * 100))
         field("charging", lambda: bool(m.cmd(0x07, 0x84, 0x02)[1]))
-        field("dpi", lambda: (lambda a: [be16(a, 1), be16(a, 3)])(m.cmd(0x04, 0x85, 0x07, b"\x01")))
+        field("dpi", lambda: dpi(m.cmd(0x04, 0x85, 0x07, b"\x01")))
         field("dpiStages", lambda: dpi_stages(m.cmd(0x04, 0x86, 0x26, b"\x01")))
         field("pollingRate", lambda: polling_rate(m))
         # Class 0x05 is undocumented. On a Viper V3 Pro with one stored profile,
         # 0x05:0x8A reads 1 and 0x05:0x81 reads "1 entry: profile 1". The DPI
         # storage byte (1-5) addresses the same slots.
         field("profile", lambda: m.cmd(0x05, 0x8A, 0x0A)[0])
-        field("profiles", lambda: (lambda a: list(a[1:1 + a[0]]))(m.cmd(0x05, 0x81, 0x0A)))
+        field("profiles", lambda: profiles(m.cmd(0x05, 0x81, 0x0A)))
     return out
+
+
+def dpi(a: list[int]) -> list[int]:
+    return [be16(a, 1), be16(a, 3)]
+
+
+def profiles(a: list[int]) -> list[int]:
+    return list(a[1:1 + a[0]])
 
 
 def dpi_stages(a: list[int]) -> dict:

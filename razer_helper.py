@@ -42,6 +42,21 @@ class DeviceError(Exception):
     pass
 
 
+class HidDevice:
+    def __init__(self, path: bytes):
+        self.dev = hid.device()
+        self.dev.open_path(path)
+
+    def close(self):
+        self.dev.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
 # 90-byte feature report on report ID 0, as documented by openrazer.
 
 MOUSE_TID = 0x1F
@@ -64,16 +79,9 @@ def mouse_packet(cmd_class: int, cmd_id: int, size: int, args: bytes = b"") -> b
     return bytes(p)
 
 
-class Mouse:
+class Mouse(HidDevice):
     # path that answered last time, per PID, so later calls skip the search
     paths: dict[int, bytes] = {}
-
-    def __init__(self, path: bytes):
-        self.dev = hid.device()
-        self.dev.open_path(path)
-
-    def close(self):
-        self.dev.close()
 
     def cmd(self, cmd_class: int, cmd_id: int, size: int, args: bytes = b"") -> list[int]:
         self.dev.send_feature_report(b"\x00" + mouse_packet(cmd_class, cmd_id, size, args))
@@ -126,8 +134,7 @@ def be16(a: list[int], i: int) -> int:
 
 def read_mouse(pid: int) -> dict:
     out: dict = {"connection": MICE[pid], "pid": f"0x{pid:04X}"}
-    m = Mouse.open(pid)
-    try:
+    with Mouse.open(pid) as m:
         fw = m.cmd(0x00, 0x81, 0x02)
         out["firmware"] = f"v{fw[0]}.{fw[1]}"
 
@@ -147,8 +154,6 @@ def read_mouse(pid: int) -> dict:
         # storage byte (1-5) addresses the same slots.
         field("profile", lambda: m.cmd(0x05, 0x8A, 0x0A)[0])
         field("profiles", lambda: (lambda a: list(a[1:1 + a[0]]))(m.cmd(0x05, 0x81, 0x0A)))
-    finally:
-        m.close()
     return out
 
 
@@ -213,14 +218,7 @@ def pa_query(cmd: int) -> bytes:
     return pa_cmd(TYPE_QUERY, cmd)
 
 
-class Headset:
-    def __init__(self, path: bytes):
-        self.dev = hid.device()
-        self.dev.open_path(path)
-
-    def close(self):
-        self.dev.close()
-
+class Headset(HidDevice):
     @classmethod
     def open(cls) -> tuple["Headset", int]:
         for d in hid.enumerate(RAZER_VID):
@@ -285,7 +283,7 @@ class Headset:
 def read_headset() -> dict:
     h, pid = Headset.open()
     out: dict = {"pid": f"0x{pid:04X}"}
-    try:
+    with h:
         bat = h.query(PA_BATTERY)
         if bat is None:
             out["online"] = False
@@ -302,8 +300,6 @@ def read_headset() -> dict:
         fw = h.query(PA_FIRMWARE)
         if fw and len(fw) >= 2:
             out["firmware"] = f"v{fw[0]}.{fw[1]}"
-    finally:
-        h.close()
     return out
 
 
@@ -340,22 +336,16 @@ def mouse_raw(q: dict) -> dict:
     if cid < 0x80:
         raise DeviceError("only read commands (id >= 0x80) are allowed")
     pid = next((p for p, c in MICE.items() if c == q.get("conn", ["wired"])[0]), 0x00C0)
-    m = Mouse.open(pid)
-    try:
+    with Mouse.open(pid) as m:
         args = m.cmd(cls, cid, size, hexbytes(q.get("args", [""])[0]))
-    finally:
-        m.close()
     return {"args": bytes(args).hex(" ")}
 
 
 def headset_raw(q: dict) -> dict:
     """Probe endpoint: one PA query (type 0x03, read-only)."""
     cmd = int(q["cmd"][0], 16)
-    h, _ = Headset.open()
-    try:
+    with Headset.open()[0] as h:
         payload = h.query(cmd)
-    finally:
-        h.close()
     return {"payload": None if payload is None else bytes(payload).hex(" ")}
 
 
@@ -363,11 +353,8 @@ def headset_preset(q: dict) -> dict:
     value = int(q["id"][0])
     if value not in PRESETS:
         raise DeviceError(f"unknown preset {value}")
-    h, _ = Headset.open()
-    try:
+    with Headset.open()[0] as h:
         got = h.set_preset(value)
-    finally:
-        h.close()
     if got != value:
         raise DeviceError(f"headset stayed on {PRESETS.get(got, got)}")
     return {"presetId": got, "preset": PRESETS[got]}

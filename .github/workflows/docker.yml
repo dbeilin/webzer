@@ -18,10 +18,13 @@ jobs:
       - name: Request guard tests
         run: docker run --rm -v "$PWD/tests:/app/tests:ro" webzer python -m unittest -v tests.test_request_guard
 
-      - name: Time docker stop
+      - name: docker stop exits cleanly
         run: |
           docker run -d --name webzer webzer
           sleep 2
           start=$(date +%s)
           docker stop webzer
-          echo "docker stop took $(( $(date +%s) - start ))s"
+          took=$(( $(date +%s) - start ))
+          code=$(docker inspect -f '{{.State.ExitCode}}' webzer)
+          echo "docker stop took ${took}s, exit code ${code}"
+          test "$took" -lt 5 && test "$code" -eq 0

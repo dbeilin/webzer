@@ -42,7 +42,6 @@ class DeviceError(Exception):
     pass
 
 
-# ---------------------------------------------------------------- mouse ----
 # 90-byte feature report on report ID 0, as documented by openrazer.
 
 MOUSE_TID = 0x1F
@@ -171,7 +170,6 @@ def polling_rate(m: Mouse) -> int | None:
     return POLL.get(m.cmd(0x00, 0x85, 0x01)[0])
 
 
-# -------------------------------------------------------------- headset ----
 # "PA" protocol on the 0xFF00 interface, report ID 2, 64-byte frames.
 # Layout from HaloBattery (providers/blackshark.py) / OpenRazer PR #2862.
 
@@ -284,10 +282,6 @@ class Headset:
         return got
 
 
-def preset_list() -> list[dict]:
-    return [{"id": k, "name": v} for k, v in PRESETS.items()]
-
-
 def read_headset() -> dict:
     h, pid = Headset.open()
     out: dict = {"pid": f"0x{pid:04X}"}
@@ -304,7 +298,7 @@ def read_headset() -> dict:
         if preset:
             out["presetId"] = preset[0]
             out["preset"] = PRESETS.get(preset[0], f"Unknown ({preset[0]})")
-        out["presets"] = preset_list()
+        out["presets"] = [{"id": k, "name": v} for k, v in PRESETS.items()]
         fw = h.query(PA_FIRMWARE)
         if fw and len(fw) >= 2:
             out["firmware"] = f"v{fw[0]}.{fw[1]}"
@@ -313,7 +307,6 @@ def read_headset() -> dict:
     return out
 
 
-# ---------------------------------------------------------------- server ----
 
 def status() -> dict:
     present = {d["product_id"] for d in hid.enumerate(RAZER_VID)}

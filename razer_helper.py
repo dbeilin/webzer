@@ -386,25 +386,19 @@ class Handler(SimpleHTTPRequestHandler):
         # Browsers omit Origin on cross-site GETs, but always send Sec-Fetch-Site.
         return self.headers.get("Sec-Fetch-Site", "none") in ("same-origin", "none")
 
-    def do_POST(self):
-        if not self._from_own_page():
-            return self.send_error(403)
-        url = urlparse(self.path)
-        route = POST_ROUTES.get(url.path)
-        if route is None:
-            return self.send_error(404)
-        self._api(route, url)
-
     def do_GET(self):
+        self._handle(ROUTES, super().do_GET)
+
+    def do_POST(self):
+        self._handle(POST_ROUTES, lambda: self.send_error(404))
+
+    def _handle(self, routes, fallback):
         if not self._from_own_page():
             return self.send_error(403)
         url = urlparse(self.path)
-        route = ROUTES.get(url.path)
+        route = routes.get(url.path)
         if route is None:
-            return super().do_GET()
-        self._api(route, url)
-
-    def _api(self, route, url):
+            return fallback()
         try:
             with lock:
                 body, code = route(parse_qs(url.query)), 200

@@ -1,0 +1,7 @@
+[project]
+name = "webzer"
+version = "0.1.0"
+description = "Battery, profiles and EQ presets for Razer devices, in the browser"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = ["hidapi>=0.14"]

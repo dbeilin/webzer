@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Razer Devices</title>
+<style>
+  :root {
+    --bg: #0d0f10; --panel: #16191b; --line: #262b2f; --text: #e8ebed; --muted: #858d93;
+    --accent: #44d62c; --warn: #f0b429; --low: #ff5c5c; --track: #23282c;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f3f4f5; --panel: #fff; --line: #dfe3e6; --text: #15181a; --muted: #5f676d;
+      --accent: #24a313; --warn: #b07400; --low: #d32f2f; --track: #e7eaec; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 1.4rem; margin: 0; flex: 1; }
+  .updated { color: var(--muted); font-size: 13px; }
+  button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 14px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: progress; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h2 { font-size: 1rem; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; margin: 2px 0 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+  .battery { display: flex; align-items: baseline; gap: 10px; }
+  .pct { font-size: 2.6rem; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1; }
+  .chg { color: var(--muted); font-size: 14px; }
+  .chg.on { color: var(--accent); }
+  .bar { height: 8px; background: var(--track); border-radius: 4px; margin: 12px 0 20px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s ease; }
+  .low .pct { color: var(--low); } .low .bar > div { background: var(--low); }
+  .mid .bar > div { background: var(--warn); }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .stages { display: flex; gap: 6px; flex-wrap: wrap; }
+  .stage { border: 1px solid var(--line); border-radius: 6px; padding: 0 7px; font-size: 13px; }
+  .stage.active { border-color: var(--accent); color: var(--accent); }
+  .presets { margin-top: 18px; display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: center; }
+  .group { color: var(--muted); font-size: 13px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 4px 12px; font-size: 13px; border-radius: 999px; min-width: 36px; }
+  .chip.active { border-color: var(--accent); color: var(--accent); cursor: default; }
+  .chip.pending { border-color: var(--warn); color: var(--warn); }
+  .chip:disabled { cursor: progress; }
+  .empty { color: var(--muted); padding: 24px 0 8px; }
+  .err { color: var(--low); font-size: 13px; margin-top: 12px; }
+  .banner { background: color-mix(in srgb, var(--low) 15%, transparent); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 16px; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  footer { margin-top: 24px; color: var(--muted); font-size: 13px; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Razer devices</h1>
+    <span class="updated" id="updated"></span>
+    <button id="refresh">Refresh</button>
+  </header>
+  <div id="banner"></div>
+  <div class="grid">
+    <section class="card" id="mouse"><h2>Viper V3 Pro</h2><p class="empty">Loading…</p></section>
+    <section class="card" id="headset"><h2>BlackShark V2 Pro</h2><p class="empty">Loading…</p></section>
+  </div>
+  <footer>Refreshes every 30 seconds. Quit Razer Synapse while using this. <a href="probe.html">Raw HID probe</a></footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

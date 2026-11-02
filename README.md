@@ -16,9 +16,11 @@ The page only calls `fetch`, so any browser works.
 browser  --HTTP-->  razer_helper.py  --HID-->  mouse / headset
 ```
 
-The headset's vendor interface (usage page `0xFF00`) is open to WebHID in Chrome.
-The mouse answers Razer commands only on its Generic Desktop / Mouse collection, and whether Chrome lets
-a page use that collection hasn't been tested. The helper handles both devices, so the page works in any browser.
+The helper exists because Chrome's WebHID can't reach the mouse's Razer commands. The mouse answers them
+only on its Generic Desktop / Mouse collection. On the cable and the dongle, Chrome hides that collection and
+exposes no feature reports, so sending one fails with `NotAllowedError`.
+The headset's vendor interface (usage page `0xFF00`) is open to WebHID, but the helper handles it too, so one
+page covers both devices in any browser.
 
 ## Run
 

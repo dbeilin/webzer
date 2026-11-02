@@ -37,6 +37,11 @@ If the mouse is asleep, its card shows `no interface answered (read error)`. Mov
 
 `uv run razer_helper.py --once` prints the status JSON and exits.
 
+`uv run razer_helper.py --open` also opens the page in your default browser, and stops the helper about
+3 minutes after the last tab closes. If a helper is already running, it only opens the page.
+On Windows, a desktop shortcut to `.venv\Scripts\pythonw.exe razer_helper.py --open`, starting in the repo folder,
+does this without a console window.
+
 ## Docker
 
 The image works on Linux hosts only. Docker Desktop on Windows and macOS can't see USB HID devices, so use `uv run` there.

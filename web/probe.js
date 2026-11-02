@@ -3,10 +3,9 @@ import { RAZER_VID, TRANSACTION_IDS, COMMANDS, hex, hx, transact } from './razer
 const $ = (id) => document.getElementById(id);
 const logEl = $('log');
 let devices = [];
-let knownTid = null; // transaction ID that last got an "ok" reply
+let lastOkTid = null;
 const listening = new WeakSet();
 
-// ---------- logging ----------
 function log(msg, kind = '') {
   const line = document.createElement('div');
   line.className = kind;
@@ -21,7 +20,6 @@ function run(fn) {
   queue = queue.then(fn).catch((e) => log(`ERROR ${e.name}: ${e.message}`, 'err'));
 }
 
-// ---------- device description ----------
 const reportBytes = (r) => Math.ceil(r.items.reduce((s, i) => s + i.reportSize * i.reportCount, 0) / 8);
 const devName = (d) => `${d.productName || 'Unknown'} [${hx(d.productId >> 8)}${hx(d.productId & 0xff).slice(2)}]`;
 
@@ -68,7 +66,6 @@ function describe(d) {
   };
 }
 
-// ---------- rendering ----------
 function render() {
   const wrap = $('devices');
   wrap.replaceChildren();
@@ -103,7 +100,7 @@ function render() {
       return o;
     })
   );
-  // Default to the first interface that exposes feature report 0 (where Razer commands go).
+  // Razer commands go to feature report 0.
   const best = devices.findIndex((d) => featureIds(d).includes(0));
   target.value = prev && devices[prev] ? prev : String(best >= 0 ? best : 0);
 }
@@ -122,7 +119,7 @@ async function ensureOpen(d) {
       if (!$('logInput').checked) return;
       const bytes = new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength);
       const s = `input ← ${devName(d)} report ${e.reportId}: ${hex(bytes)}`;
-      if (s === last) return; // collapse repeats
+      if (s === last) return;
       last = s;
       log(s, 'in');
     });
@@ -135,18 +132,17 @@ function targetDevice() {
   return d;
 }
 
-// ---------- Razer commands ----------
 async function razer(d, cmd, { args, label } = {}) {
   await ensureOpen(d);
   const tidSel = $('tid').value;
-  const tids = tidSel === 'auto' ? (knownTid != null ? [knownTid, ...TRANSACTION_IDS.filter((t) => t !== knownTid)] : TRANSACTION_IDS) : [Number(tidSel)];
+  const tids = tidSel === 'auto' ? (lastOkTid != null ? [lastOkTid, ...TRANSACTION_IDS.filter((t) => t !== lastOkTid)] : TRANSACTION_IDS) : [Number(tidSel)];
   const name = label ?? cmd.label ?? `${hx(cmd.cmdClass)} ${hx(cmd.cmdId)}`;
   let lastOut = null;
   for (const tid of tids) {
     const out = await transact(d, { ...cmd, args: args ?? cmd.args ?? [], transactionId: tid });
     lastOut = out;
     if (out.res && out.res.status === 0x02) {
-      knownTid = tid;
+      lastOkTid = tid;
       const value = cmd.decode ? cmd.decode(out.res.args) : hex(out.res.args);
       log(`${name}: ${value}   [tid ${hx(tid)}, ${devName(d)}]`, 'ok');
       log(`   → ${hex(out.sent)}\n   ← ${hex(out.res.raw)}`, 'dim');
@@ -159,7 +155,6 @@ async function razer(d, cmd, { args, label } = {}) {
   return lastOut;
 }
 
-// ---------- wiring ----------
 function setupEnv() {
   const env = $('env');
   const problems = [];

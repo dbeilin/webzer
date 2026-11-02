@@ -4,6 +4,8 @@
 export const RAZER_VID = 0x1532;
 export const REPORT_LEN = 90;
 
+const BUSY = 0x01;
+
 export const STATUS = {
   0x00: 'new',
   0x01: 'busy',
@@ -19,12 +21,11 @@ export const TRANSACTION_IDS = [0x1f, 0xff, 0x3f, 0x9f, 0x08];
 const h2 = (n) => n.toString(16).padStart(2, '0');
 export const hx = (n) => '0x' + h2(n).toUpperCase();
 
-// Hex dump that collapses trailing zero padding.
-export function hex(bytes, trim = true) {
+export function hex(bytes, collapseZeros = true) {
   let end = bytes.length;
-  if (trim) while (end > 0 && bytes[end - 1] === 0) end--;
+  if (collapseZeros) while (end > 0 && bytes[end - 1] === 0) end--;
   const s = Array.from(bytes.subarray(0, end), (b) => h2(b)).join(' ');
-  if (!trim || end === bytes.length) return s;
+  if (!collapseZeros || end === bytes.length) return s;
   return `${s}${end ? ' ' : ''}… (${bytes.length - end} × 00)`;
 }
 
@@ -66,7 +67,6 @@ export function parsePacket(bytes, cmdClass, cmdId) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Send one command and poll for the reply while the device reports "busy".
 export async function transact(device, req, { delay = 40, retries = 12 } = {}) {
   const sent = buildPacket(req);
   await device.sendFeatureReport(0, sent);
@@ -77,7 +77,7 @@ export async function transact(device, req, { delay = 40, retries = 12 } = {}) {
     const view = await device.receiveFeatureReport(0);
     raw = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
     res = parsePacket(raw, req.cmdClass, req.cmdId);
-    if (res && res.status !== 0x01) break;
+    if (res && res.status !== BUSY) break;
   }
   return { sent, raw, res };
 }

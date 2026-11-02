@@ -21,7 +21,7 @@ function renderMouse(mice) {
     el.innerHTML = card('Viper V3 Pro', [], '<p class="empty">Not connected. Plug in the cable or the dongle.</p>');
     return;
   }
-  // With the cable and the dongle both plugged in there are two entries; show the one that answered.
+  // With the cable and the dongle both plugged in there are two entries. Show the one that answered.
   const m = mice.find((x) => x.battery != null) ?? mice[0];
   const conn = mice.map((x) => (x.connection === 'wired' ? 'Cable' : 'Wireless')).join(' + ');
   if (m.error) {

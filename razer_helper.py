@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import threading
 import time
+import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -35,6 +37,11 @@ HEADSETS = {0x0555, 0x0556, 0x0557}
 
 # One HID conversation at a time: replies are read back from a shared buffer.
 lock = threading.Lock()
+
+# With --open, stop once no page has asked for anything for this long. An open
+# tab refreshes every 30 s, and a hidden one at least once a minute.
+IDLE_STOP_SECONDS = 180
+last_request = time.monotonic()
 
 
 class DeviceError(Exception):
@@ -395,8 +402,10 @@ class Handler(SimpleHTTPRequestHandler):
         self._handle(POST_ROUTES, lambda: self.send_error(404))
 
     def _handle(self, routes, fallback):
+        global last_request
         if not self._from_own_page():
             return self.send_error(403)
+        last_request = time.monotonic()
         url = urlparse(self.path)
         route = routes.get(url.path)
         if route is None:
@@ -420,12 +429,34 @@ class Handler(SimpleHTTPRequestHandler):
         super().log_request(code, size)
 
 
+def already_running() -> bool:
+    # Binding can't tell: on Windows SO_REUSEADDR lets a second server share the port.
+    try:
+        with socket.create_connection(("127.0.0.1", PORT), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def stop_when_idle(server: ThreadingHTTPServer):
+    while (left := last_request + IDLE_STOP_SECONDS - time.monotonic()) > 0:
+        time.sleep(left)
+    server.shutdown()
+
+
 if __name__ == "__main__":
     if "--once" in sys.argv:
         print(json.dumps(status(), indent=2))
         sys.exit()
+    url = f"http://localhost:{PORT}"
+    if "--open" in sys.argv and already_running():
+        webbrowser.open(url)
+        sys.exit()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"webzer on http://localhost:{PORT}  (Ctrl+C to stop)", flush=True)
+    print(f"webzer on {url}  (Ctrl+C to stop)", flush=True)
+    if "--open" in sys.argv:
+        threading.Thread(target=stop_when_idle, args=(server,), daemon=True).start()
+        webbrowser.open(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -42,17 +42,28 @@ If the mouse is asleep, its card shows `no interface answered (read error)`. Mov
 The image works on Linux hosts only. Docker Desktop on Windows and macOS can't see USB HID devices, so use `uv run` there.
 
 ```bash
-docker build -t webzer .
 docker run --rm -p 127.0.0.1:8137:8137 \
   -v /run/udev:/run/udev:ro \
   $(for d in /dev/hidraw*; do echo --device "$d"; done) \
-  webzer
+  ghcr.io/dbeilin/webzer:latest
 ```
 
 Docker passes the device nodes in when the container starts. If you plug in a device later, restart the container.
 Inside the container the helper listens on all interfaces, so keep the `127.0.0.1:` prefix on `-p`.
 
-CI builds the image on every push and runs it with no devices attached. See `.github/workflows/docker.yml`.
+The image has `linux/amd64` and `linux/arm64` variants, and these tags:
+
+| Tag | Points to |
+|---|---|
+| `latest` | The newest release tag |
+| `0.1.0`, `0.1` | A release tag |
+| `edge` | The newest commit on `main` |
+| `sha-abc1234` | One commit |
+
+`docker build -t webzer .` builds the image locally.
+
+CI builds and tests the image on every pull request and on every push to `main` and to release tags.
+It publishes the image only after the tests pass, and never from a pull request. See `.github/workflows/docker.yml`.
 
 ## API
 
